@@ -32,14 +32,12 @@ open class DebuggerTestBase {
 }
 
 object DebuggerTestUtils {
-    const val PROPERTY_ENABLE_DEBUG = "debug-agent-enabled"
-    const val PROPERTY_LOG_LEVEL = "debug-agent-log-level"
     fun tryBuildDebuggerIndexes() {
         val classLoader = Thread.currentThread().contextClassLoader
         if (System.getProperty(PROPERTY_ENABLE_DEBUG).toBoolean()) {
             DebuggerTestAssertions.enabled = true
             val logLevel = try {
-                System.getProperty(PROPERTY_LOG_LEVEL)?.let { LogLevel.valueOf(it.toUpperCase()) }
+                System.getProperty(PROPERTY_DEBUG_LOG_LEVEL)?.let { LogLevel.valueOf(it.toUpperCase()) }
             } catch (_: IllegalArgumentException) {
                 null
             } ?: LogLevel.INFO

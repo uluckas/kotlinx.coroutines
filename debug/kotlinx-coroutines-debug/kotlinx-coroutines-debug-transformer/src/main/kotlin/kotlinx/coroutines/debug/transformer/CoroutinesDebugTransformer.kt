@@ -11,9 +11,7 @@ import org.jetbrains.org.objectweb.asm.tree.MethodNode
 import org.jetbrains.org.objectweb.asm.tree.VarInsnNode
 import java.io.File
 import java.lang.instrument.ClassFileTransformer
-import java.net.URLClassLoader
 import java.security.ProtectionDomain
-import java.net.URL
 
 
 private fun ClassNode.isCoroutineImplOrSubType() =
@@ -48,7 +46,7 @@ private fun MethodNode.addSuspendCallHandlers(
     suspendCallsInThisMethod.forEach {
         val position = CallPosition(classNode.sourceFile, lines[it] ?: -1)
         val call = SuspendCall(it.buildMethodId(), this.buildMethodId(classNode), position)
-        val key = putIntoAllSuspendCallsMap(classNode.name, call)
+        val key = allSuspendCallsMap.classNameIndexedPut(classNode.name, call)
         instructions.insert(it, generateAfterSuspendCall(continuationVarIndex, key))
     }
 }
@@ -75,7 +73,7 @@ private fun MethodNode.transformMethod(classNode: ClassNode) {
                 "cont: $continuation, isAnonymous: $isAnonymous"
     }
     if (isDoResume) {
-        val key = putIntoKnownDoResumeFunctionsMap(classNode.name, buildMethodId(classNode))
+        val key = knownDoResumeFunctionsMap.classNameIndexedPut(classNode.name, buildMethodId(classNode))
         instructions.insert(generateHandleDoResumeCallEnter(continuation, key))
         if (!isAnonymous) return
     }
@@ -118,8 +116,19 @@ class CoroutinesDebugTransformer : ClassFileTransformer {
     fun transformBytes(bytes: ByteArray?) = transform(null, null, null, null, bytes)
 }
 
-class FilesTransformer(private val inputDir: File, private val outputDir: File = inputDir) {
+class FilesTransformer(private val inputDir: File, private val outputDir: File = inputDir, logLevel: String = "error") {
+
+    init {
+        Logger.config = LoggerConfig(try {
+            LogLevel.valueOf(logLevel.toUpperCase())
+        } catch (e: IllegalArgumentException) {
+            LogLevel.INFO
+        })
+    }
+
     fun transform() {
+        allSuspendCallsMap.clear()
+        knownDoResumeFunctionsMap.clear()
         exceptions = AppendOnlyThreadSafeList()
         outputDir.mkdirs()
         info { "Transforming from $inputDir to $outputDir" }
@@ -135,9 +144,9 @@ class FilesTransformer(private val inputDir: File, private val outputDir: File =
             throw Exception("Encountered errors while transforming", exceptions?.firstOrNull())
         info { "Saving indexes into $outputDir" }
         File(outputDir, ALL_SUSPEND_CALLS_DUMP_FILE_NAME)
-                .writeAll(SuspendCall.Companion, allSuspendCallsMap.toList())
+                .appendAll(SuspendCall.Companion, allSuspendCallsMap.toList())
         File(outputDir, KNOWND_DORESUME_FUNCTIONS_DUMP_FILE_NAME)
-                .writeAll(MethodId.Companion, knownDoResumeFunctionsMap.toList())
+                .appendAll(MethodId.Companion, knownDoResumeFunctionsMap.toList())
     }
 
     private fun File.toOutputFile() = File(outputDir, relativeTo(inputDir).toString())

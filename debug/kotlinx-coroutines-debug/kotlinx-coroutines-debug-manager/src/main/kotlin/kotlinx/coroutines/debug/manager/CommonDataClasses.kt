@@ -16,8 +16,14 @@ fun <T> String.readKV(reader: StupidSerializer<T>): Pair<String, T> {
 
 fun <T> File.readAll(reader: StupidSerializer<T>) = readLines().map { it.readKV(reader) }
 
+fun <T> File.appendAll(writer: StupidSerializer<T>, keyValues: List<Pair<String, T>>)
+        = appendText(keyValues.joinAndWrite(writer))
+
 fun <T> File.writeAll(writer: StupidSerializer<T>, keyValues: List<Pair<String, T>>)
-        = writeText(keyValues.joinToString("\n") { (k, v) -> "$k$KV_SEPARATOR${writer.write(v)}" })
+        = writeText(keyValues.joinAndWrite(writer))
+
+private fun <T> List<Pair<String, T>>.joinAndWrite(writer: StupidSerializer<T>)
+        = joinToString("\n") { (k, v) -> "$k$KV_SEPARATOR${writer.write(v)}" }
 
 data class MethodId(val name: String, val className: String, val desc: String) {
     init {

@@ -16,21 +16,12 @@ private fun Collection<String>.lastIndexForClassName(name: String) =
 
 val allSuspendCallsMap = ConcurrentHashMap<String, SuspendCall>()
 
-fun putIntoAllSuspendCallsMap(currentClassName: String, call: SuspendCall): String { //TODO: rewrite
-    val lastKeyIndex = allSuspendCallsMap.keys.lastIndexForClassName(currentClassName) ?: -1
-    val key = classNameBasedKey(currentClassName, lastKeyIndex + 1)
-    allSuspendCallsMap[key] = call
-    return key
-}
-
 val knownDoResumeFunctionsMap = ConcurrentHashMap<String, MethodId>()
 
-fun putIntoKnownDoResumeFunctionsMap(currentClassName: String, method: MethodId): String {
-    val lastKeyIndex = knownDoResumeFunctionsMap.keys.lastIndexForClassName(currentClassName) ?: -1
-    val key = classNameBasedKey(currentClassName, lastKeyIndex + 1)
-    knownDoResumeFunctionsMap[key] = method
-    return key
-}
+fun <T> MutableMap<String, T>.classNameIndexedPut(className: String, data: T) =
+        classNameBasedKey(className, (keys.lastIndexForClassName(className) ?: -1) + 1).also {
+            put(it, data)
+        }
 
 enum class StackChangedEvent { Created, Suspended, Removed, WakedUp }
 
