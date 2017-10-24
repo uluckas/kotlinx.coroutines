@@ -3,12 +3,17 @@ package kotlinx.coroutines.debug.transformer
 import org.jetbrains.org.objectweb.asm.Opcodes
 import org.jetbrains.org.objectweb.asm.commons.InstructionAdapter
 import org.jetbrains.org.objectweb.asm.tree.InsnList
+import org.jetbrains.org.objectweb.asm.tree.MethodInsnNode
 import org.jetbrains.org.objectweb.asm.tree.MethodNode
 
 private val EVENTS_HANDLER_CLASS_NAME = "kotlinx/coroutines/debug/manager/EventsHandler"
 private val AFTER_SUSPEND_CALL = "handleAfterSuspendCall"
 private val DO_RESUME_ENTER = "handleDoResumeEnter"
 private val WRAP_COMPLETION = "maybeWrapCompletionAndCreateNewCoroutine"
+
+internal val MethodInsnNode.isEventHandlerCall: Boolean
+    get() = owner == EVENTS_HANDLER_CLASS_NAME
+            && listOf(AFTER_SUSPEND_CALL, DO_RESUME_ENTER, WRAP_COMPLETION).contains(name)
 
 internal inline fun code(block: InstructionAdapter.() -> Unit): InsnList =
         MethodNode().apply { block(InstructionAdapter(this)) }.instructions

@@ -85,18 +85,26 @@ private fun MethodNode.transformMethod(classNode: ClassNode) {
     addSuspendCallHandlers(suspendCalls, continuation, classNode)
 }
 
+private fun MethodNode.isTransformed() = instructions.sequence.any { it is MethodInsnNode && it.isEventHandlerCall }
+
+private fun ClassNode.isTransformed() = methods.any { it.isTransformed() }
+
 class CoroutinesDebugTransformer : ClassFileTransformer {
     override fun transform(
             loader: ClassLoader?,
             className: String?,
             classBeingRedefined: Class<*>?,
             protectionDomain: ProtectionDomain?,
-            classfileBuffer: ByteArray?
+            classfileBuffer: ByteArray
     ): ByteArray {
         //if (className?.startsWith(DEBUG_AGENT_PACKAGE_PREFIX) == true && classfileBuffer != null) return classfileBuffer
         val reader = ClassReader(classfileBuffer)
         val classNode = ClassNode()
         reader.accept(classNode, 0)
+        if (classNode.isTransformed()) {
+            info { "${classNode.name} is already transformed" }
+            return classfileBuffer
+        }
         for (method in classNode.methods.map { it as MethodNode }) {
             try {
                 method.transformMethod(classNode)
@@ -113,7 +121,7 @@ class CoroutinesDebugTransformer : ClassFileTransformer {
         return writer.toByteArray()
     }
 
-    fun transformBytes(bytes: ByteArray?) = transform(null, null, null, null, bytes)
+    fun transformBytes(bytes: ByteArray) = transform(null, null, null, null, bytes)
 }
 
 class FilesTransformer(private val inputDir: File, private val outputDir: File = inputDir, logLevel: String = "error") {
@@ -136,6 +144,7 @@ class FilesTransformer(private val inputDir: File, private val outputDir: File =
             if (file.isClassFile()) info { "Transforming $file" }
             val bytes = file.readBytes()
             val outBytes = if (file.isClassFile()) classesTransformer.transformBytes(bytes) else bytes
+            if (file.isClassFile() && outBytes.contentEquals(bytes)) info { "nothing changed" }
             val outFile = file.toOutputFile()
             outFile.parentFile.mkdirs()
             outFile.writeBytes(outBytes)
@@ -143,6 +152,7 @@ class FilesTransformer(private val inputDir: File, private val outputDir: File =
         if (exceptions?.isNotEmpty() == true)
             throw Exception("Encountered errors while transforming", exceptions?.firstOrNull())
         info { "Saving indexes into $outputDir" }
+        //if we have many input directories we should append index, not rewrite from scratch
         File(outputDir, ALL_SUSPEND_CALLS_DUMP_FILE_NAME)
                 .appendAll(SuspendCall.Companion, allSuspendCallsMap.toList())
         File(outputDir, KNOWND_DORESUME_FUNCTIONS_DUMP_FILE_NAME)

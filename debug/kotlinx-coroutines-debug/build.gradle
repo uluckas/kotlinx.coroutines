@@ -28,21 +28,24 @@ allprojects {
 }
 
 dependencies {
-    compile project(':kotlinx-coroutines-debug-agent')
+    //compileOnly project(':kotlinx-coroutines-debug-agent')
+    compile project(':kotlinx-coroutines-debug-agent') //explained below
     shadow "org.jetbrains.kotlin:kotlin-stdlib-jre8:$kotlin_version" //will be add to pom.xml when publish
 }
 
-jar.enabled = false //prevent `build` task from empty jar creation
+jar {
+    enabled = false //prevent `build` task from empty jar creation
+    dependsOn shadowJar //real jar, will be resolved as artifact when depends on this module
+}
 
-tasks.build.dependsOn shadowJar
 
 shadowJar {
     classifier = null
 
-    configurations = [project.configurations.compile]
+    configurations = [project.configurations.compileOnly, project.configurations.compile]
 
     dependencies {
-        include dependency('org.jetbrains.asm:asm-all.*') //from project(":kotlinx-coroutines-debug-transformer")
+        include dependency('org.jetbrains.asm:asm-all.*') //from ":kotlinx-coroutines-debug-transformer"
         include dependency(':kotlinx-coroutines-debug.*')
     }
 
@@ -58,13 +61,24 @@ jar {
     }
 }
 
+// in ideal world we should make dependency on project(':kotlinx-coroutines-debug-agent') compileOnly
+// and remove shadow dependency on stdlib. after that we can publish artifact with correct pom.xml
+// (with dependency only on stdlib) with standard mavenJava publication
+//
+// The problem is: after making dependency on project(':kotlinx-coroutines-debug-agent') compileOnly
+// idea can't resolve dependencies for editor and code of 'kotlinx-coroutines-debug-test'
+// and 'kotlinx-coroutines-gradle-plugin' modules become very red
+
 publishing {
     publications {
         shadow(MavenPublication) { publication ->
             project.shadow.component(publication)
         }
+        /*mavenJava(MavenPublication) {
+            from components.java
+        }*/
     }
 }
 
-//will be called as ':clean' from the root project, needed to clean this builds subprojects
+//will be called as ':clean' from the root project, needed to clean this build's subprojects
 clean.dependsOn subprojects.collect { it.tasks.clean }

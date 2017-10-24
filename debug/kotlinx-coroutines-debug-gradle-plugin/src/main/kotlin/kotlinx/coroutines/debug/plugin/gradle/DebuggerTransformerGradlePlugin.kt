@@ -129,6 +129,7 @@ open class DebuggerTransformTask : DefaultTask() {
 
     @TaskAction
     fun transform() {
+        outputDir.deleteRecursively()
         inputFiles.forEach {
             FilesTransformer(it, outputDir, logLevel).transform()
         }
