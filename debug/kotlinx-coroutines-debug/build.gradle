@@ -65,3 +65,6 @@ publishing {
         }
     }
 }
+
+//will be called as ':clean' from the root project, needed to clean this builds subprojects
+clean.dependsOn subprojects.collect { it.tasks.clean }

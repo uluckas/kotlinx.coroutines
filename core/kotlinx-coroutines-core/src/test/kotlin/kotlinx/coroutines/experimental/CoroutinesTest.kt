@@ -26,8 +26,8 @@ class CoroutinesTest : TestBase() {
     private val THIS = "kotlinx.coroutines.experimental.CoroutinesTest"
     private val KCE = "kotlinx.coroutines.experimental"
 
-    @Category(DebuggableTest::class)
     @Test
+    @Category(DebuggableTest::class)
     fun testSimple() = runBlocking {
         expect(1)
         assertDebuggerPausedHereState(coroutine("coroutine#1", Running()) {
@@ -45,8 +45,8 @@ class CoroutinesTest : TestBase() {
         finish(2)
     }
 
-    @Category(DebuggableTest::class)
     @Test
+    @Category(DebuggableTest::class)
     fun testLaunchAndYieldJoin() = runBlocking {
         expect(1)
         val job = launch(coroutineContext) {

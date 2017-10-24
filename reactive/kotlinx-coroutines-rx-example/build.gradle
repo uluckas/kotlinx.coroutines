@@ -4,6 +4,4 @@ dependencies {
     compile "com.squareup.retrofit2:retrofit:$retrofit_version"
     compile "com.squareup.retrofit2:converter-gson:$retrofit_version"
     compile "com.squareup.retrofit2:adapter-rxjava:$retrofit_version"
-
-    debuggable project(path: ':kotlinx-coroutines-reactive', configuration: 'debuggable')
 }

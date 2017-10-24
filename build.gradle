@@ -23,7 +23,6 @@ subprojects {
     apply plugin: 'kotlin'
     apply plugin: 'org.jetbrains.dokka'
     apply plugin: 'kotlinx-atomicfu'
-    apply plugin: 'kotlinx-coroutines-debug'
 
     sourceCompatibility = 1.6
     targetCompatibility = 1.6
@@ -81,15 +80,56 @@ ext.skipPublishing = { projectName ->
 
 subprojects {
     if (!skipClassesTransformation(it.name)) {
+        apply plugin: 'kotlinx-coroutines-debug'
+
         dependencies {
             compileOnly "org.jetbrains.kotlinx:atomicfu:$atomicFU_version"
 
-            testCompileOnly "org.jetbrains.kotlinx:atomicfu:$atomicFU_version"
-            testRuntime "org.jetbrains.kotlinx:atomicfu:$atomicFU_version"
-
+            testCompile "org.jetbrains.kotlinx:atomicfu:$atomicFU_version"
             testCompile "org.jetbrains.kotlinx:kotlinx-coroutines-debug-test"
         }
+
+        atomicFU {
+            inputFiles = sourceSets.main.output.classesDirs
+            outputDir = file("$buildDir/classes-atomicfu/main")
+            classPath = sourceSets.main.runtimeClasspath
+        }
+
+        jar {
+            from files(atomicFU.outputs, sourceSets.main.output.resourcesDir)
+        }
+
+        test {
+            classpath = files(configurations.testRuntime, atomicFU.outputs, sourceSets.test.output.classesDirs,
+                    sourceSets.main.output.resourcesDir)
+        }
+
+        debuggerTransformMain {
+            inputFiles = atomicFU.outputs.files
+        }
+
+        testWithDebugger {
+            useJUnit {
+                includeCategories 'kotlinx.coroutines.debug.test.DebuggableTest'
+            }
+        }
+
+        if (it.name != 'kotlinx-coroutines-core') {
+            dependencies {
+                compile project(':kotlinx-coroutines-core')
+                //the only way IDEA can resolve test classes
+                testCompile project(':kotlinx-coroutines-core').sourceSets.test.output
+            }
+
+            dokka.dependsOn project(':kotlinx-coroutines-core').dokka
+
+            dokka.externalDocumentationLink {
+                url = new URL(dokka.core_docs_url)
+                packageListUrl = new URL("file://${dokka.core_docs_file}")
+            }
+        }
     }
+
 
     if (!skipPublishing(it.name)) {
         apply plugin: 'maven-publish'
@@ -103,96 +143,6 @@ subprojects {
     }
 }
 
-subprojects {
-    if (skipClassesTransformation(project.name)) return
+apply plugin: 'base'
 
-    atomicFU {
-        inputFiles = sourceSets.main.output.classesDirs
-        outputDir = file("$buildDir/classes-atomicfu/main")
-        classPath = sourceSets.main.runtimeClasspath
-    }
-
-    task debuggerTransformMain(type: kotlinx.coroutines.debug.plugin.gradle.DebuggerTransformTask) {
-        inputFiles = atomicFU.outputs.files
-        outputDir = file("$buildDir/classes-debuggable/main")
-    }
-
-    task debuggerTransformTest(type: kotlinx.coroutines.debug.plugin.gradle.DebuggerTransformTask) {
-        inputFiles = sourceSets.test.output.classesDirs
-        outputDir = file("$buildDir/classes-debuggable/test")
-    }
-
-    task generateDebuggableSourcesJar(type: Jar) {
-        classifier = 'debuggable'
-        from files(debuggerTransformMain.outputs, sourceSets.main.output.resourcesDir)
-    }
-
-    jar {
-        from files(atomicFU.outputs, sourceSets.main.output.resourcesDir)
-    }
-
-    configurations {
-        debuggable {
-            transitive = true
-        }
-    }
-
-    artifacts {
-        debuggable generateDebuggableSourcesJar
-    }
-
-    test {
-        classpath = files(configurations.testRuntime, atomicFU.outputs, sourceSets.test.output.classesDirs,
-                sourceSets.main.output.resourcesDir)
-    }
-
-
-    task testWithDebugger(type: Test) {
-        dependsOn configurations.debuggable //execute generateDebuggableSourcesJar for subprojects
-
-        doFirst {
-            //replace all dependencies on other projects classes with its debuggable(instrumented) classes
-            def externalDependencies = configurations.testRuntime.allDependencies
-                    .matching { !(it instanceof ProjectDependency) }
-
-            def externalFiles = configurations.testRuntime.files(*externalDependencies.toArray())
-
-            def projectCompileDeps = configurations.compile.allDependencies
-                    .matching { it instanceof ProjectDependency }
-            def testCompileDeps = configurations.testCompile.allDependencies
-
-            def testCompileFiles = configurations.testCompile.files(*testCompileDeps.toArray())
-            def projectCompileFiles = configurations.compile.files(*projectCompileDeps.toArray())
-            def testCompileOnlyFiles = testCompileFiles - projectCompileFiles
-
-            classpath = files(testCompileOnlyFiles, externalFiles, configurations.debuggable,
-                    generateDebuggableSourcesJar, debuggerTransformTest.outputs)
-
-            systemProperty "debug-agent-enabled", true
-            systemProperty "debug-agent-log-level", "debug"
-        }
-    }
-}
-
-configure(subprojects.findAll { !skipClassesTransformation(it.name) && it.name != 'kotlinx-coroutines-core' }) {
-    // 'kotlinx-coroutines-android' project name is lexicographically smaller than 'kotlinx-coroutines-core's,
-    // therefore its subprojects {...} clojure evaluated before 'kotlinx-coroutines-core's and
-    // can't find sourceSets property of 'kotlinx-coroutines-core'
-
-    dependencies {
-        compile project(':kotlinx-coroutines-core')
-        debuggable project(path: ':kotlinx-coroutines-core', configuration: 'debuggable')
-
-        //TODO: automatically add dependency for debuggable configuration if compile project specified ?
-
-        //the only way IDEA can resolve test classes
-        testCompile project(':kotlinx-coroutines-core').sourceSets.test.output
-    }
-
-    dokka.dependsOn project(':kotlinx-coroutines-core').dokka
-
-    dokka.externalDocumentationLink {
-        url = new URL(dokka.core_docs_url)
-        packageListUrl = new URL("file://${dokka.core_docs_file}")
-    }
-}
+clean.dependsOn gradle.includedBuilds.collect { it.task(':clean') }
