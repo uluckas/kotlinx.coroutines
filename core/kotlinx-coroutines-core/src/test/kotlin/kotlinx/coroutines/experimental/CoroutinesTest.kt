@@ -16,13 +16,25 @@
 
 package kotlinx.coroutines.experimental
 
+import kotlinx.coroutines.debug.test.*
+import kotlinx.coroutines.debug.test.DebuggerTestAssertions.assertDebuggerPausedHereState
 import org.junit.Test
+import org.junit.experimental.categories.Category
 import java.io.IOException
 
 class CoroutinesTest : TestBase() {
+    private val THIS = "kotlinx.coroutines.experimental.CoroutinesTest"
+    private val KCE = "kotlinx.coroutines.experimental"
+
     @Test
+    @Category(DebuggableTest::class)
     fun testSimple() = runTest {
         expect(1)
+        assertDebuggerPausedHereState(coroutine("coroutine#1", Running()) {
+            method("$THIS\$testSimple\$1.invoke")
+            marker("coroutine#1", true)
+            zeroOrMore(any)
+        })
         finish(2)
     }
 
@@ -34,17 +46,32 @@ class CoroutinesTest : TestBase() {
     }
 
     @Test
+    @Category(DebuggableTest::class)
     fun testLaunchAndYieldJoin() = runTest {
         expect(1)
         val job = launch(coroutineContext) {
             expect(3)
+            assertDebuggerPausedHereState(coroutine("coroutine#1", Suspended("$KCE.JobSupport.joinSuspend")) {
+                zeroOrMore(any)
+            }, coroutine("coroutine#2", Running()) {
+                method("$THIS\$testLaunchAndYieldJoin\$1\$job\$1.invoke")
+                marker("coroutine#2", true)
+                zeroOrMore(any)
+            })
             yield()
             expect(4)
         }
         expect(2)
+        val current = coroutine("coroutine#1", Running()) {
+            method("$THIS\$testLaunchAndYieldJoin\$1.invoke")
+            marker("coroutine#1", true)
+            zeroOrMore(any)
+        }
+        assertDebuggerPausedHereState(current, coroutine("coroutine#2", Created()))
         check(job.isActive && !job.isCompleted)
         job.join()
         check(!job.isActive && job.isCompleted)
+        assertDebuggerPausedHereState(current)
         finish(5)
     }
 

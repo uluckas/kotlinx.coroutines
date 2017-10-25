@@ -1,5 +1,21 @@
 rootProject.name = 'kotlinx.coroutines'
 
+includeBuild ('debug/kotlinx-coroutines-debug') {
+    dependencySubstitution {
+        substitute module('org.jetbrains.kotlinx:kotlinx-coroutines-debug') with project(':')
+    }
+}
+includeBuild ('debug/kotlinx-coroutines-debug-gradle-plugin') {
+    dependencySubstitution {
+        substitute module('org.jetbrains.kotlinx:kotlinx-coroutines-debug-gradle-plugin') with project(':')
+    }
+}
+includeBuild ('debug/kotlinx-coroutines-debug-test') {
+    dependencySubstitution {
+        substitute module('org.jetbrains.kotlinx:kotlinx-coroutines-debug-test') with project(':')
+    }
+}
+
 include 'kotlinx-coroutines-core'
 include 'kotlinx-coroutines-io'
 

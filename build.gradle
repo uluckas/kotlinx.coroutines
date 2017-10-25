@@ -16,6 +16,7 @@ buildscript {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
         classpath "org.jetbrains.dokka:dokka-gradle-plugin:$dokka_version"
         classpath "org.jetbrains.kotlinx:atomicfu-gradle-plugin:$atomicFU_version"
+        classpath "org.jetbrains.kotlinx:kotlinx-coroutines-debug-gradle-plugin"
         classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.3'
     }
 }
@@ -53,11 +54,11 @@ configure(subprojects.findAll { !sourceless.contains(it.name)  }) {
 
     sourceCompatibility = 1.6
     targetCompatibility = 1.6
-    
+
     tasks.withType(JavaCompile) {
         options.encoding = 'UTF-8'
     }
-    
+
     kotlin.experimental.coroutines "enable"
 
     tasks.withType(Test) {
@@ -85,10 +86,12 @@ def internal = sourceless + ['benchmarks', 'knit']
 
 configure(subprojects.findAll { !internal.contains(it.name) }) {
     apply plugin: 'kotlinx-atomicfu'
+    apply plugin: 'kotlinx-coroutines-debug'
 
     dependencies {
         compileOnly "org.jetbrains.kotlinx:atomicfu:$atomicFU_version"
         testCompile "org.jetbrains.kotlinx:atomicfu:$atomicFU_version"
+        testCompile "org.jetbrains.kotlinx:kotlinx-coroutines-debug-test"
     }
 
     atomicFU {
@@ -105,6 +108,16 @@ configure(subprojects.findAll { !internal.contains(it.name) }) {
     test {
         classpath = files(configurations.testRuntime, atomicFU.outputs, sourceSets.test.output.classesDirs,
                 sourceSets.main.output.resourcesDir)
+    }
+
+    debuggerTransformMain {
+        inputFiles = atomicFU.outputs.files
+    }
+
+    testWithDebugger {
+        useJUnit {
+            includeCategories 'kotlinx.coroutines.debug.test.DebuggableTest'
+        }
     }
 }
 

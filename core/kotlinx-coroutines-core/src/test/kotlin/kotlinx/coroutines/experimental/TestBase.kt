@@ -18,6 +18,7 @@ package kotlinx.coroutines.experimental
 
 import guide.test.checkTestThreads
 import guide.test.currentThreads
+import kotlinx.coroutines.debug.test.DebuggerTestBase
 import org.junit.After
 import org.junit.Before
 import java.util.concurrent.atomic.AtomicBoolean
@@ -43,7 +44,7 @@ import java.util.concurrent.atomic.AtomicReference
  * }
  * ```
  */
-open class TestBase {
+open class TestBase : DebuggerTestBase() {
     /**
      * Is `true` when nightly stress test is done.
      */
